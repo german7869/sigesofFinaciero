@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: sigesof_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sigesof_financiero
+      MYSQL_USER: sigesof
+      MYSQL_PASSWORD: sigesof123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sigesof_backend
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: "SIGE Soft Financiero"
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: sigesof_financiero
+      DB_USERNAME: sigesof
+      DB_PASSWORD: sigesof123
+      SANCTUM_STATEFUL_DOMAINS: localhost:5173
+      SESSION_DOMAIN: localhost
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./backend:/var/www/html
+    command: >
+      sh -c "composer install --no-dev --optimize-autoloader &&
+             php artisan key:generate --force &&
+             php artisan migrate --force &&
+             php artisan db:seed --force &&
+             php artisan serve --host=0.0.0.0 --port=8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sigesof_frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
